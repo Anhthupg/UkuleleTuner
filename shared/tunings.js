@@ -296,6 +296,173 @@ const TUNING_CATALOG = {
     },
   },
 
+  // ---------- Bowed-string family ----------
+  // Same engine, different body shape (hourglass with F-holes, no
+  // frets) inferred via inferBodyShape() in app.js. fftSize bumps to
+  // 8192 for any tuning whose lowest pitch lands below ~60 Hz (bass
+  // family) so YIN sees enough periods of the fundamental.
+
+  violin: {
+    label: 'Violin (4-string)',
+    tunings: {
+      'standard': {
+        label: 'Standard (G D A E)',
+        strings: ['G3', 'D4', 'A4', 'E5'],
+      },
+    },
+  },
+
+  violin5: {
+    label: 'Violin 5-string',
+    tunings: {
+      'standard-5': {
+        label: 'Standard 5 (C G D A E)',
+        strings: ['C3', 'G3', 'D4', 'A4', 'E5'],
+      },
+    },
+  },
+
+  fiddle: {
+    label: 'Fiddle (4-string)',
+    // Same instrument as violin physically; separate category so the
+    // Fiddle Tuner brand can default to fiddle-culture cross-tunings
+    // and Old-Time / Cajun variants instead of just classical GDAE.
+    tunings: {
+      'standard': {
+        label: 'Standard (G D A E)',
+        strings: ['G3', 'D4', 'A4', 'E5'],
+      },
+      'cross-aeae': {
+        label: 'Cross AEAE (Old-Time)',
+        strings: ['A3', 'E4', 'A4', 'E5'],
+      },
+      'cross-gdgd-sawmill': {
+        label: 'Cross GDGD / Sawmill (Old-Time)',
+        strings: ['G3', 'D4', 'G4', 'D5'],
+      },
+      'ddad': {
+        label: 'DDAD (modal)',
+        strings: ['D3', 'D4', 'A4', 'D5'],
+      },
+      'cajun-fdaf': {
+        label: 'Cajun (F D A F)',
+        strings: ['F3', 'D4', 'A4', 'F5'],
+      },
+      'cumberland-gap-gdgb': {
+        label: 'Cumberland Gap (G D G B)',
+        strings: ['G3', 'D4', 'G4', 'B4'],
+      },
+      'high-bass-adae': {
+        label: 'High Bass (A D A E)',
+        strings: ['A3', 'D4', 'A4', 'E5'],
+      },
+    },
+  },
+
+  fiddle5: {
+    label: 'Fiddle 5-string',
+    tunings: {
+      'standard-5': {
+        label: 'Standard 5 (C G D A E)',
+        strings: ['C3', 'G3', 'D4', 'A4', 'E5'],
+      },
+    },
+  },
+
+  viola: {
+    label: 'Viola (4-string)',
+    tunings: {
+      'standard': {
+        label: 'Standard (C G D A) — fifth below violin',
+        strings: ['C3', 'G3', 'D4', 'A4'],
+      },
+    },
+  },
+
+  viola5: {
+    label: 'Viola 5-string',
+    tunings: {
+      'standard-5-low-f': {
+        label: 'Standard 5 low F (F C G D A)',
+        strings: ['F2', 'C3', 'G3', 'D4', 'A4'],
+      },
+      'standard-5-high-e': {
+        label: 'Standard 5 high E (C G D A E) — violin top',
+        strings: ['C3', 'G3', 'D4', 'A4', 'E5'],
+      },
+    },
+  },
+
+  cello: {
+    label: 'Cello (4-string)',
+    tunings: {
+      'standard': {
+        label: 'Standard (C G D A) — octave below viola',
+        strings: ['C2', 'G2', 'D3', 'A3'],
+      },
+      'fifth-suite-scordatura': {
+        label: 'Bach 5th Suite scordatura (C G D G)',
+        strings: ['C2', 'G2', 'D3', 'G3'],
+      },
+    },
+  },
+
+  cello5: {
+    label: 'Cello 5-string (Bach 6th-suite style)',
+    tunings: {
+      'baroque-cgdae': {
+        label: '5-string Bach 6th (C G D A E)',
+        strings: ['C2', 'G2', 'D3', 'A3', 'E4'],
+      },
+    },
+  },
+
+  bass: {
+    label: 'Double Bass / Bass Guitar (4-string)',
+    tunings: {
+      'standard': {
+        label: 'Standard (E A D G) — octave below guitar low 4',
+        strings: ['E1', 'A1', 'D2', 'G2'],
+      },
+      'drop-d': {
+        label: 'Drop D (D A D G)',
+        strings: ['D1', 'A1', 'D2', 'G2'],
+      },
+      'orchestral-fifths-cgda': {
+        label: 'Orchestral fifths (C G D A) — solo classical',
+        strings: ['C1', 'G1', 'D2', 'A2'],
+      },
+      'solo-tuning-up-step': {
+        label: 'Solo tuning (whole step up: F# B E A)',
+        strings: ['F#1', 'B1', 'E2', 'A2'],
+      },
+    },
+  },
+
+  bass5: {
+    label: 'Bass 5-string',
+    tunings: {
+      'standard-low-b': {
+        label: 'Standard 5 low B (B E A D G)',
+        strings: ['B0', 'E1', 'A1', 'D2', 'G2'],
+      },
+      'standard-high-c': {
+        label: 'Standard 5 high C (E A D G C)',
+        strings: ['E1', 'A1', 'D2', 'G2', 'C3'],
+      },
+    },
+  },
+
+  bass6: {
+    label: 'Bass 6-string',
+    tunings: {
+      'standard-6': {
+        label: 'Standard 6 (B E A D G C)',
+        strings: ['B0', 'E1', 'A1', 'D2', 'G2', 'C3'],
+      },
+    },
+  },
+
   doubleHeaded: {
     label: 'Double-headed (2 necks)',
     // No `tunings` here — UI switches to per-neck independent pickers

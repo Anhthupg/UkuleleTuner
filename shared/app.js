@@ -21,8 +21,44 @@
 
 const IN_TUNE_CENTS = 5;
 const TRAIL_SECONDS = 4;
-const TRAIL_RGB = '74, 222, 128';
-const TRAIL_RGB_INTUNE = '134, 239, 172';
+// Trail color is brand-themed via window.APP_DEFAULTS.themeHue at
+// init time. Defaults match the original guitar green; a brand entry
+// (UkuleleTuner, ViolinTuner, ...) overrides themeHue and these get
+// recomputed before rendering starts. Mutable on purpose so HSL
+// derivation in init() can update them without a full pipeline rewrite.
+let TRAIL_RGB = '74, 222, 128';        // base saturated trail
+let TRAIL_RGB_INTUNE = '134, 239, 172'; // brighter inside ±5¢
+
+/** Convert HSL → "R, G, B" string (used by canvas rgba()). */
+function hslToRgbString(h, s, l) {
+  s = s / 100; l = l / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = ((h % 360) + 360) % 360 / 60;
+  const x = c * (1 - Math.abs(hp % 2 - 1));
+  let r1 = 0, g1 = 0, b1 = 0;
+  if (hp < 1) { r1 = c; g1 = x; }
+  else if (hp < 2) { r1 = x; g1 = c; }
+  else if (hp < 3) { g1 = c; b1 = x; }
+  else if (hp < 4) { g1 = x; b1 = c; }
+  else if (hp < 5) { r1 = x; b1 = c; }
+  else { r1 = c; b1 = x; }
+  const m = l - c / 2;
+  const r = Math.round((r1 + m) * 255);
+  const g = Math.round((g1 + m) * 255);
+  const b = Math.round((b1 + m) * 255);
+  return `${r}, ${g}, ${b}`;
+}
+
+/** Apply a theme hue across CSS vars and trail RGBs. Idempotent. */
+function applyThemeHue(hue) {
+  const root = document.documentElement;
+  root.style.setProperty('--theme-hue', String(hue));
+  // Saturation/lightness chosen to match the original green at H=141:
+  //   #4ade80 ≈ hsl(141, 71%, 58%)   ← TRAIL_RGB
+  //   #86efac ≈ hsl(141, 76%, 73%)   ← TRAIL_RGB_INTUNE
+  TRAIL_RGB = hslToRgbString(hue, 71, 58);
+  TRAIL_RGB_INTUNE = hslToRgbString(hue, 76, 73);
+}
 const ROW_FILL = 0.8;
 const MAX_VIEW_CENTS = 80;
 // Loosened from -40 → -55 because acoustic-guitar plucks (especially
@@ -167,8 +203,24 @@ function inferBodyShape(category) {
   if (!category) return 'figure8';
   if (category === 'mandolin' || category === 'mandola') return 'teardrop';
   if (category === 'banjo' || category === 'banjo4') return 'round';
+  if (
+    category === 'violin' || category === 'violin5' ||
+    category === 'fiddle' || category === 'fiddle5' ||
+    category === 'viola' || category === 'viola5' ||
+    category === 'cello' || category === 'cello5' ||
+    category === 'bass' || category === 'bass5' || category === 'bass6'
+  ) return 'hourglass';
   return 'figure8';
 }
+
+/** Bowed-string instruments don't have frets — the diagram should
+ *  skip the fret loop and the "fingerboard" surface stays smooth. */
+const BOWED_CATEGORIES = new Set([
+  'violin', 'violin5', 'fiddle', 'fiddle5',
+  'viola', 'viola5', 'cello', 'cello5',
+  'bass', 'bass5', 'bass6',
+]);
+function isBowedCategory(c) { return BOWED_CATEGORIES.has(c); }
 
 function totalStringCount() {
   return state.necks.reduce((s, n) => s + n.strings.length, 0);
@@ -243,6 +295,9 @@ function buildNeckPickers() {
     'six', 'seven', 'eight', 'twelve',
     'ukulele', 'ukulele6', 'ukulele8',
     'mandolin', 'mandola', 'banjo', 'banjo4',
+    'violin', 'violin5', 'fiddle', 'fiddle5',
+    'viola', 'viola5', 'cello', 'cello5',
+    'bass', 'bass5', 'bass6',
   ];
 
   state.neckPickers.forEach((pick, neckIdx) => {
@@ -462,14 +517,18 @@ async function startMic() {
     const ctx = new Ctx();
     const src = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    // 4096 samples ≈ 85 ms at 48 kHz. Needed for guitar's low E2
-    // (~82 Hz, period 12.2 ms) — at the previous 2048 the YIN window
-    // contained only 1.7 periods of E2, below the 2-period minimum
-    // YIN needs to lock the fundamental. 4096 gives ~3.5 periods of
-    // E2 and ~2.5 periods of B1 (7-string low B), comfortably above
-    // the 2-period floor. The 85 ms detection latency is still well
-    // under perceptual threshold for tuner feedback.
-    analyser.fftSize = 4096;
+    // Window size scales to the tuning's lowest fundamental:
+    //   · Guitar / uke / mandolin / violin / viola / cello → 4096 ≈
+    //     85 ms. Gives ≥3.5 periods of guitar E2 (82 Hz) — the floor
+    //     case for these instruments — comfortably above YIN's 2-period
+    //     minimum.
+    //   · Bass family (E1 ≈ 41 Hz, B0 ≈ 31 Hz on 5/6-string) → 8192 ≈
+    //     170 ms. 4096 only holds 1.7–2.0 periods of B0 / 3.5 of E1;
+    //     8192 gives 5.3 periods of B0 and 7.0 of E1. Detection
+    //     latency doubles but stays under 200 ms — acceptable for the
+    //     long sustain of bass / cello bowing or plucked decay.
+    const range = tuningFreqRange();
+    analyser.fftSize = range.minHz < 60 ? 8192 : 4096;
     const gain = ctx.createGain();
     // 2× on desktop because acoustic-guitar low-string plucks land
     // ~10 dB quieter than dan tranh metal strings; previous 1× left
@@ -1321,6 +1380,78 @@ function drawOneGuitar(ctx, x, y, w, h, neck, neckIdx, dpr) {
     ctx.ellipse(holeCx, cy, bodyW * 0.10, maxRy * 0.20, 0, 0, Math.PI * 2);
     ctx.fill();
     bridgeX = tailX - bodyW * 0.20;
+  } else if (bodyShape === 'hourglass') {
+    // Violin / fiddle / viola / cello / bass — figure-8 with a
+    // pinched waist (C-bouts), F-holes flanking the bridge, scroll
+    // pegbox at the headstock side. No sound hole on the lower bout.
+    const upperRy = h * 0.30;
+    const upperRx = bodyW * 0.30;
+    const lowerRy = h * 0.38;
+    const lowerRx = bodyW * 0.34;
+    const upperCx = bodyStartX + upperRx * 0.95;
+    const lowerCx = x + w - lowerRx * 0.95;
+    // Outline as a single closed bezier path so the C-bout waist
+    // pinches inward instead of two separate ellipses.
+    const upperRightX = upperCx + upperRx;
+    const lowerLeftX = lowerCx - lowerRx;
+    const waistX = (upperRightX + lowerLeftX) / 2;
+    const waistRy = h * 0.20;
+    ctx.beginPath();
+    ctx.moveTo(upperCx - upperRx, cy);
+    // top arc of upper bout
+    ctx.bezierCurveTo(
+      upperCx - upperRx, cy - upperRy,
+      upperCx + upperRx, cy - upperRy,
+      upperRightX, cy,
+    );
+    // upper-bout shoulder → waist (C-bout) on top
+    ctx.bezierCurveTo(
+      upperRightX + bodyW * 0.04, cy - waistRy * 0.9,
+      waistX - bodyW * 0.04, cy - waistRy * 1.1,
+      waistX, cy - waistRy,
+    );
+    ctx.bezierCurveTo(
+      waistX + bodyW * 0.04, cy - waistRy * 1.1,
+      lowerLeftX - bodyW * 0.04, cy - lowerRy * 0.9,
+      lowerLeftX, cy,
+    );
+    // top → bottom of lower bout
+    ctx.bezierCurveTo(
+      lowerLeftX, cy + lowerRy,
+      lowerCx + lowerRx, cy + lowerRy,
+      lowerCx + lowerRx, cy,
+    );
+    // bottom of lower bout → bottom waist
+    ctx.bezierCurveTo(
+      lowerCx + lowerRx - bodyW * 0.04, cy + lowerRy * 0.5,
+      waistX + bodyW * 0.04, cy + waistRy * 1.1,
+      waistX, cy + waistRy,
+    );
+    ctx.bezierCurveTo(
+      waistX - bodyW * 0.04, cy + waistRy * 1.1,
+      upperRightX + bodyW * 0.04, cy + waistRy * 0.9,
+      upperRightX, cy,
+    );
+    // bottom of upper bout
+    ctx.bezierCurveTo(
+      upperCx + upperRx, cy + upperRy,
+      upperCx - upperRx, cy + upperRy,
+      upperCx - upperRx, cy,
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // F-holes — two thin slit shapes flanking the bridge area.
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    const fHoleX = waistX + bodyW * 0.08;
+    const fHoleRy = lowerRy * 0.45;
+    [-1, 1].forEach((side) => {
+      const fy = cy + side * lowerRy * 0.30;
+      ctx.beginPath();
+      ctx.ellipse(fHoleX, fy, bodyW * 0.012, fHoleRy * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    bridgeX = fHoleX + bodyW * 0.06;
   } else {
     // Figure-8 (guitar / ukulele).
     const upperRy = h * 0.34;
@@ -1354,15 +1485,18 @@ function drawOneGuitar(ctx, x, y, w, h, neck, neckIdx, dpr) {
   // Fretboard (neck).
   ctx.fillStyle = 'rgba(50, 30, 20, 0.65)';
   ctx.fillRect(neckX, cy - fretBoardH / 2, neckW, fretBoardH);
-  // Frets.
-  ctx.strokeStyle = 'rgba(200, 200, 200, 0.30)';
-  ctx.lineWidth = 1 * dpr;
-  for (let f = 1; f <= 5; f++) {
-    const fx = neckX + (neckW * f) / 5.5;
-    ctx.beginPath();
-    ctx.moveTo(fx, cy - fretBoardH / 2);
-    ctx.lineTo(fx, cy + fretBoardH / 2);
-    ctx.stroke();
+  // Frets — skipped on bowed-string fingerboards (violin, viola,
+  // cello, bass) which are smooth.
+  if (!isBowedCategory(neck.category)) {
+    ctx.strokeStyle = 'rgba(200, 200, 200, 0.30)';
+    ctx.lineWidth = 1 * dpr;
+    for (let f = 1; f <= 5; f++) {
+      const fx = neckX + (neckW * f) / 5.5;
+      ctx.beginPath();
+      ctx.moveTo(fx, cy - fretBoardH / 2);
+      ctx.lineTo(fx, cy + fretBoardH / 2);
+      ctx.stroke();
+    }
   }
 
   // Headstock — angled trapezoid.
@@ -1745,6 +1879,9 @@ function init() {
       const sub = document.querySelector('header .sub');
       if (sub) sub.textContent = d.subtitle;
     }
+    if (typeof d.themeHue === 'number') applyThemeHue(d.themeHue);
+  } else {
+    applyThemeHue(141); // default green for backwards-compat
   }
 
   buildCategorySelect();
