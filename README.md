@@ -1,6 +1,6 @@
 # UkuleleTuner
 
-Free online tuner — part of the LuteTuner family.
+Free online tuner — part of the StringTuner family.
 
 This repo deploys to **anhthuphan.com/UkuleleTuner/** via GitHub Pages.
 
@@ -10,7 +10,7 @@ This repo deploys to **anhthuphan.com/UkuleleTuner/** via GitHub Pages.
 - [MandolineTuner](https://github.com/Anhthupg/MandolineTuner) — anhthuphan.com/MandolineTuner
 - [BanjoTuner](https://github.com/Anhthupg/BanjoTuner) — anhthuphan.com/BanjoTuner
 
-The shared engine source-of-truth is the [LuteTuner](https://github.com/Anhthupg/LuteTuner) repo. Each brand repo here is a deployment artifact that bundles the engine with its own brand-default `window.APP_DEFAULTS` and SEO meta.
+The shared engine source-of-truth is the [StringTuner](https://github.com/Anhthupg/StringTuner) repo. Each brand repo here is a deployment artifact that bundles the engine with its own brand-default `window.APP_DEFAULTS` and SEO meta.
 
 ---
 
